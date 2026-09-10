@@ -1,3 +1,12 @@
+## 1.0.4
+
+- Added `HlPagedList.noMoreBuilder` to render a customizable footer after all pages have loaded.
+
+## 1.0.3
+
+- Corrected `HlFeedback.closeAllLoading` to remove the loading route directly instead of waiting for that route's completion Future, which could leave the overlay visible indefinitely.
+- Added regression coverage for closing a loading overlay after a new page is pushed and later popped.
+
 ## 1.0.2
 
 - Fixed `HlFeedback.showLoading` missing `Material` ancestor, which caused yellow text underlines in custom loading widgets.

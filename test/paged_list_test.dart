@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hl_ui/hl_ui.dart';
 
@@ -69,10 +70,43 @@ void main() {
     expect(controller.items, [1, 2, 3]);
     expect(controller.hasMore, isFalse);
   });
+
+  testWidgets('renders the no-more footer after every page is loaded', (
+    tester,
+  ) async {
+    final controller = HlPagedController<int>(
+      fetchPage: (_) async => const _Page([1], page: 1, pageSize: 20),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SizedBox(
+          height: 300,
+          child: HlPagedList<int>(
+            controller: controller,
+            loadOnMount: false,
+            itemBuilder: (_, item, _) => Text('$item'),
+            noMoreBuilder: (_) => const Text('No more data'),
+          ),
+        ),
+      ),
+    );
+
+    await controller.loadFirst();
+    await tester.pump();
+
+    expect(find.text('No more data'), findsOneWidget);
+  });
 }
 
 class _Page implements HlPage<int> {
-  const _Page(this.items, {required this.page, required this.pageSize, this.total});
+  const _Page(
+    this.items, {
+    required this.page,
+    required this.pageSize,
+    this.total,
+  });
 
   @override
   final List<int> items;

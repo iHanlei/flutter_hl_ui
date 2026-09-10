@@ -213,6 +213,7 @@ class HlPagedList<T> extends StatefulWidget {
   /// - [emptyBuilder]: 空数据时的占位内容；不传时显示空组件。
   /// - [errorBuilder]: 加载失败时的占位内容，接收错误对象。
   /// - [loadingBuilder]: 加载中的占位内容。
+  /// - [noMoreBuilder]: 没有更多数据时的列表尾部内容。
   /// - [loadOnMount]: 挂载后是否自动加载第一页，默认 `true`。
   /// - [loadMoreThreshold]: 距底部多少像素时触发加载下一页，默认 200。
   const HlPagedList({
@@ -224,6 +225,7 @@ class HlPagedList<T> extends StatefulWidget {
     this.emptyBuilder,
     this.errorBuilder,
     this.loadingBuilder,
+    this.noMoreBuilder,
     this.loadOnMount = true,
     this.loadMoreThreshold = 200,
   });
@@ -248,6 +250,9 @@ class HlPagedList<T> extends StatefulWidget {
 
   /// 加载中占位内容。
   final WidgetBuilder? loadingBuilder;
+
+  /// 没有更多数据时的列表尾部内容。
+  final WidgetBuilder? noMoreBuilder;
 
   /// 挂载后是否自动加载第一页。
   final bool loadOnMount;
@@ -352,7 +357,7 @@ class _HlPagedListState<T> extends State<HlPagedList<T>> {
               if (controller.hasMore || controller.isLoading) {
                 return _loading(context);
               }
-              return const SizedBox.shrink();
+              return _noMore(context);
             },
           ),
         );
@@ -364,6 +369,9 @@ class _HlPagedListState<T> extends State<HlPagedList<T>> {
   Widget _loading(BuildContext context) =>
       widget.loadingBuilder?.call(context) ??
       const Center(child: CircularProgressIndicator());
+
+  Widget _noMore(BuildContext context) =>
+      widget.noMoreBuilder?.call(context) ?? const SizedBox.shrink();
 
   /// 构建错误占位内容，默认提供重试按钮。
   Widget _error(BuildContext context, Object error) => Center(
