@@ -215,7 +215,6 @@ class HlFeedback {
   }
 
   Route<void>? _loadingRoute;
-  Future<void>? _loadingPushFuture;
 
   /// 展示全屏加载遮罩，重复调用不会叠加。
   ///
@@ -237,10 +236,8 @@ class HlFeedback {
       ),
     );
     _loadingRoute = route;
-    _loadingPushFuture = _state.push<void>(route);
-    _loadingPushFuture!.whenComplete(() {
+    _state.push<void>(route).whenComplete(() {
       if (identical(_loadingRoute, route)) _loadingRoute = null;
-      _loadingPushFuture = null;
     });
   }
 
@@ -249,14 +246,12 @@ class HlFeedback {
     final route = _loadingRoute;
     if (route == null) return;
     _loadingRoute = null;
-    // 若 route 仍在 push 过程中，等入栈后再移除，避免 isActive=false 时跳过。
-    final pushFuture = _loadingPushFuture;
-    if (pushFuture != null) {
-      pushFuture.whenComplete(() {
+    if (route.isActive) {
+      _state.removeRoute(route);
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (route.isActive) _state.removeRoute(route);
       });
-    } else if (route.isActive) {
-      _state.removeRoute(route);
     }
   }
 
