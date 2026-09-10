@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 /// 一页数据的结果抽象。
 ///
 /// 由 [HlPagedController.fetchPage] 返回，描述当页条目、
-/// 页码与每页大小。
+/// 页码与每页大小。[total] 为可选的总条目数，提供时控制器
+/// 会优先用它判断是否还有更多数据。
 abstract interface class HlPage<T> {
   /// 当页的条目列表。
   List<T> get items;
@@ -15,6 +16,10 @@ abstract interface class HlPage<T> {
 
   /// 每页条目数。
   int get pageSize;
+
+  /// 总条目数；为 `null` 时控制器回退为按 `items.length >= pageSize`
+  /// 判断是否还有更多数据。
+  int? get total;
 }
 
 /// [HlPage] 的默认不可变实现。
@@ -24,10 +29,12 @@ class HlPageData<T> implements HlPage<T> {
   /// - [items]: 当页的条目列表。
   /// - [page]: 当前页码，从 1 开始。
   /// - [pageSize]: 每页条目数。
+  /// - [total]: 总条目数，可选。
   const HlPageData({
     required this.items,
     required this.page,
     required this.pageSize,
+    this.total,
   });
 
   @override
@@ -38,6 +45,9 @@ class HlPageData<T> implements HlPage<T> {
 
   @override
   final int pageSize;
+
+  @override
+  final int? total;
 }
 
 /// 分页请求参数，由 [HlPagedController] 构造后传给 [HlPagedController.fetchPage]。
@@ -174,7 +184,10 @@ class HlPagedController<T> extends ChangeNotifier {
       if (revision == _revision) {
         if (replace) _items.clear();
         _items.addAll(page.items);
-        hasMore = page.items.length >= pageSize;
+        final pageTotal = page.total;
+        hasMore = pageTotal != null
+            ? _items.length < pageTotal
+            : page.items.length >= pageSize;
         if (hasMore) _nextPage++;
       }
     } catch (exception) {
@@ -201,6 +214,7 @@ class HlPagedList<T> extends StatefulWidget {
   /// - [errorBuilder]: 加载失败时的占位内容，接收错误对象。
   /// - [loadingBuilder]: 加载中的占位内容。
   /// - [loadOnMount]: 挂载后是否自动加载第一页，默认 `true`。
+  /// - [loadMoreThreshold]: 距底部多少像素时触发加载下一页，默认 200。
   const HlPagedList({
     super.key,
     required this.controller,
@@ -211,6 +225,7 @@ class HlPagedList<T> extends StatefulWidget {
     this.errorBuilder,
     this.loadingBuilder,
     this.loadOnMount = true,
+    this.loadMoreThreshold = 200,
   });
 
   /// 分页控制器。
@@ -236,6 +251,9 @@ class HlPagedList<T> extends StatefulWidget {
 
   /// 挂载后是否自动加载第一页。
   final bool loadOnMount;
+
+  /// 距底部多少像素时触发加载下一页。
+  final double loadMoreThreshold;
 
   @override
   State<HlPagedList<T>> createState() => _HlPagedListState<T>();
@@ -283,7 +301,8 @@ class _HlPagedListState<T> extends State<HlPagedList<T>> {
       return;
     }
     final position = _scrollController.position;
-    if (position.maxScrollExtent - position.pixels <= 200) {
+    if (position.maxScrollExtent - position.pixels <=
+        widget.loadMoreThreshold) {
       widget.controller.loadNext();
     }
   }
@@ -317,6 +336,7 @@ class _HlPagedListState<T> extends State<HlPagedList<T>> {
           child: ListView.builder(
             controller: _scrollController,
             padding: widget.padding,
+            physics: const AlwaysScrollableScrollPhysics(),
             itemCount: controller.items.length + 1,
             itemBuilder: (context, index) {
               if (index < controller.items.length) {

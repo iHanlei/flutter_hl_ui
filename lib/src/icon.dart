@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,10 @@ enum HlIconType {
 ///
 /// 可加载资源/网络/文件路径下的 SVG 或位图，支持着色、尺寸、
 /// 点击回调与加载占位/错误兜底。
-class HlIcon extends StatelessWidget {
+///
+/// 网络 SVG（[HlIconType.networkSvg]）通过内部下载后用
+/// `SvgPicture.string` 渲染，因此支持 [errorWidget] 兜底。
+class HlIcon extends StatefulWidget {
   /// 创建一个图标。
   ///
   /// [source] 为资源路径或网络地址（依 [type] 而定）；
@@ -61,71 +65,145 @@ class HlIcon extends StatelessWidget {
   final Widget? errorWidget;
   final String? package;
 
+  @override
+  State<HlIcon> createState() => _HlIconState();
+}
+
+class _HlIconState extends State<HlIcon> {
+  Future<String>? _svgFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.type == HlIconType.networkSvg && widget.source.isNotEmpty) {
+      _svgFuture = _downloadSvg(widget.source);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HlIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source ||
+        oldWidget.type != widget.type) {
+      if (widget.type == HlIconType.networkSvg &&
+          widget.source.isNotEmpty) {
+        _svgFuture = _downloadSvg(widget.source);
+      } else {
+        _svgFuture = null;
+      }
+    }
+  }
+
   /// 加载中/空源的兜底内容。
   Widget get _fallback =>
-      placeholder ?? SizedBox(width: width ?? 16, height: height ?? 16);
+      widget.placeholder ??
+      SizedBox(width: widget.width ?? 16, height: widget.height ?? 16);
 
   /// 加载失败的兜底内容。
-  Widget get _error => errorWidget ?? _fallback;
+  Widget get _error => widget.errorWidget ?? _fallback;
+
+  /// 下载网络 SVG 内容，失败时抛出异常由 FutureBuilder 捕获。
+  ///
+  /// 连接超时与整体超时均为 10 秒，避免网络异常时无限等待。
+  Future<String> _downloadSvg(String url) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close().timeout(
+        const Duration(seconds: 10),
+      );
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+      return await response.transform(utf8.decoder).join().timeout(
+        const Duration(seconds: 10),
+      );
+    } finally {
+      client.close();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final child = source.isEmpty ? _fallback : _buildImage();
-    return onTap == null ? child : GestureDetector(onTap: onTap, child: child);
+    final child = widget.source.isEmpty ? _fallback : _buildImage();
+    if (widget.onTap == null) return child;
+    return Semantics(
+      button: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(onTap: widget.onTap, child: child),
+      ),
+    );
   }
 
   /// 按 [type] 构建对应的图片/SVG 组件。
   Widget _buildImage() {
-    final colorFilter = color == null
+    final colorFilter = widget.color == null
         ? null
-        : ColorFilter.mode(color!, BlendMode.srcIn);
-    return switch (type) {
-      HlIconType.assetSvg => SvgPicture.asset(
-        source,
-        package: package,
-        width: width,
-        height: height,
-        colorFilter: colorFilter,
-        placeholderBuilder: (_) => _fallback,
-      ),
-      HlIconType.networkSvg => SvgPicture.network(
-        source,
-        width: width,
-        height: height,
-        colorFilter: colorFilter,
-        placeholderBuilder: (_) => _fallback,
-      ),
-      HlIconType.fileSvg => SvgPicture.file(
-        File(source),
-        width: width,
-        height: height,
-        colorFilter: colorFilter,
-        placeholderBuilder: (_) => _fallback,
-      ),
-      HlIconType.assetImage => Image.asset(
-        source,
-        package: package,
-        width: width,
-        height: height,
-        fit: fit ?? BoxFit.cover,
-        errorBuilder: (_, _, _) => _error,
-      ),
-      HlIconType.networkImage => Image.network(
-        source,
-        width: width,
-        height: height,
-        fit: fit ?? BoxFit.cover,
-        loadingBuilder: (_, child, progress) =>
-            progress == null ? child : _fallback,
-        errorBuilder: (_, _, _) => _error,
-      ),
-      HlIconType.fileImage => Image.file(
-        File(source),
-        width: width,
-        height: height,
-        fit: fit ?? BoxFit.cover,
-        errorBuilder: (_, _, _) => _error,
-      ),
-    };
+        : ColorFilter.mode(widget.color!, BlendMode.srcIn);
+    switch (widget.type) {
+      case HlIconType.assetSvg:
+        return SvgPicture.asset(
+          widget.source,
+          package: widget.package,
+          width: widget.width,
+          height: widget.height,
+          colorFilter: colorFilter,
+          placeholderBuilder: (_) => _fallback,
+        );
+      case HlIconType.networkSvg:
+        return FutureBuilder<String>(
+          future: _svgFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _fallback;
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return _error;
+            }
+            return SvgPicture.string(
+              snapshot.data!,
+              width: widget.width,
+              height: widget.height,
+              colorFilter: colorFilter,
+            );
+          },
+        );
+      case HlIconType.fileSvg:
+        return SvgPicture.file(
+          File(widget.source),
+          width: widget.width,
+          height: widget.height,
+          colorFilter: colorFilter,
+          placeholderBuilder: (_) => _fallback,
+        );
+      case HlIconType.assetImage:
+        return Image.asset(
+          widget.source,
+          package: widget.package,
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit ?? BoxFit.cover,
+          errorBuilder: (_, _, _) => _error,
+        );
+      case HlIconType.networkImage:
+        return Image.network(
+          widget.source,
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit ?? BoxFit.cover,
+          loadingBuilder: (_, child, progress) =>
+              progress == null ? child : _fallback,
+          errorBuilder: (_, _, _) => _error,
+        );
+      case HlIconType.fileImage:
+        return Image.file(
+          File(widget.source),
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit ?? BoxFit.cover,
+          errorBuilder: (_, _, _) => _error,
+        );
+    }
   }
 }

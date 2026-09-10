@@ -215,6 +215,7 @@ class HlFeedback {
   }
 
   Route<void>? _loadingRoute;
+  Future<void>? _loadingPushFuture;
 
   /// 展示全屏加载遮罩，重复调用不会叠加。
   ///
@@ -227,14 +228,19 @@ class HlFeedback {
       barrierDismissible: dismissible,
       builder: (_) => PopScope(
         canPop: dismissible,
-        child: Center(
-          child: loadingWidget ?? const CircularProgressIndicator(),
+        child: Material(
+          color: Colors.transparent,
+          child: Center(
+            child: loadingWidget ?? const CircularProgressIndicator(),
+          ),
         ),
       ),
     );
     _loadingRoute = route;
-    _state.push<void>(route).whenComplete(() {
+    _loadingPushFuture = _state.push<void>(route);
+    _loadingPushFuture!.whenComplete(() {
       if (identical(_loadingRoute, route)) _loadingRoute = null;
+      _loadingPushFuture = null;
     });
   }
 
@@ -243,7 +249,15 @@ class HlFeedback {
     final route = _loadingRoute;
     if (route == null) return;
     _loadingRoute = null;
-    if (route.isActive) _state.removeRoute(route);
+    // 若 route 仍在 push 过程中，等入栈后再移除，避免 isActive=false 时跳过。
+    final pushFuture = _loadingPushFuture;
+    if (pushFuture != null) {
+      pushFuture.whenComplete(() {
+        if (route.isActive) _state.removeRoute(route);
+      });
+    } else if (route.isActive) {
+      _state.removeRoute(route);
+    }
   }
 
   NavigatorState get _state {
@@ -297,7 +311,10 @@ class HlFeedback {
       ..showSnackBar(
         SnackBar(
           content: GestureDetector(
-            onTap: onTap,
+            onTap: () {
+              messenger.hideCurrentSnackBar();
+              onTap?.call();
+            },
             child: Row(
               children: [
                 if (leading != null) ...[leading, const SizedBox(width: 8)],

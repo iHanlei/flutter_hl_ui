@@ -1,6 +1,8 @@
 name: hl_ui
 description: Theme-driven, accessible Flutter components for forms, feedback, and data states.
-version: 1.0.1
+version: 1.0.2
+homepage: https://github.com/iHanlei/flutter_hl_ui
+repository: https://github.com/iHanlei/flutter_hl_ui.git
 
 environment:
   sdk: ^3.9.0

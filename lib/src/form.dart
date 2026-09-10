@@ -116,7 +116,7 @@ class HlSelectField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.hlTheme;
-    return FormField<T>(
+    final field = FormField<T>(
       initialValue: value,
       validator: validator,
       builder: (state) => InputDecorator(
@@ -156,6 +156,7 @@ class HlSelectField<T> extends StatelessWidget {
         ),
       ),
     );
+    return enabled ? field : Opacity(opacity: 0.5, child: field);
   }
 }
 

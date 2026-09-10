@@ -201,7 +201,10 @@ class HlStatusView extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.padding,
-  });
+  }) : assert(
+          (actionLabel == null) == (onAction == null),
+          'actionLabel and onAction must be both set or both null',
+        );
 
   final String title;
   final String? message;

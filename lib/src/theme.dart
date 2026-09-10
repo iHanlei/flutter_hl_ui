@@ -6,18 +6,23 @@ class HlThemeData {
   /// 创建主题数据。
   ///
   /// [colorScheme] 为 Material 配色，[spacing] / [radii] 为间距与圆角
-  /// 标尺，[density] 为组件密度。
+  /// 标尺，[density] 为组件密度，[success] / [warning] 为状态色
+  /// （不传时使用默认绿色/琥珀色）。
   const HlThemeData({
     required this.colorScheme,
     this.spacing = const HlSpacing(),
     this.radii = const HlRadii(),
     this.density = VisualDensity.standard,
+    this.success = const Color(0xFF059669),
+    this.warning = const Color(0xFFD97706),
   });
 
   final ColorScheme colorScheme;
   final HlSpacing spacing;
   final HlRadii radii;
   final VisualDensity density;
+  final Color success;
+  final Color warning;
 
   /// 从 Material [ThemeData] 派生主题数据。
   ///
@@ -39,12 +44,6 @@ class HlThemeData {
 
   /// 描边色。
   Color get border => colorScheme.outlineVariant;
-
-  /// 成功状态色。
-  Color get success => const Color(0xFF059669);
-
-  /// 警告状态色。
-  Color get warning => const Color(0xFFD97706);
 }
 
 /// 间距标尺。

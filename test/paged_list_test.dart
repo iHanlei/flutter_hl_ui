@@ -49,10 +49,30 @@ void main() {
 
     expect(controller.items, [2]);
   });
+
+  test('uses total to determine hasMore when provided', () async {
+    final controller = HlPagedController<int>(
+      pageSize: 2,
+      fetchPage: (request) async => _Page(
+        request.page == 1 ? [1, 2] : [3],
+        page: request.page,
+        pageSize: 2,
+        total: 3,
+      ),
+    );
+
+    await controller.loadFirst();
+    // 第一页返回 2 条但 total=3，hasMore 应为 true
+    expect(controller.hasMore, isTrue);
+    await controller.loadNext();
+    // 加载完 3 条后 hasMore 应为 false
+    expect(controller.items, [1, 2, 3]);
+    expect(controller.hasMore, isFalse);
+  });
 }
 
 class _Page implements HlPage<int> {
-  const _Page(this.items, {required this.page, required this.pageSize});
+  const _Page(this.items, {required this.page, required this.pageSize, this.total});
 
   @override
   final List<int> items;
@@ -62,4 +82,7 @@ class _Page implements HlPage<int> {
 
   @override
   final int pageSize;
+
+  @override
+  final int? total;
 }
